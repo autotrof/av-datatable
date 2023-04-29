@@ -1,6 +1,5 @@
 {
-  "name": "av-datatable",
-  "private": true,
+  "name": "@autotrof/av-datatable",
   "version": "0.0.1",
   "files": ["dist/*"],
   "type": "module",
