@@ -1,6 +1,6 @@
 {
   "name": "@autotrof/av-datatable",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "files": [
     "dist/*"
   ],
@@ -18,15 +18,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "watch": "watch 'npm run build' ./src"
   },
   "dependencies": {
+    "@autotrof/regex-like": "^0.0.1",
     "vue": "^3.2.47"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.1.0",
     "grunt": "^1.6.1",
-    "vite": "^4.3.2"
+    "vite": "^4.3.2",
+    "watch": "^1.0.2"
   },
   "repository": {
     "type": "git",

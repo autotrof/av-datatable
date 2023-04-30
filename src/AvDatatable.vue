@@ -158,6 +158,7 @@
 
 <script setup>
 import { ref, onBeforeMount, onMounted, computed, nextTick, onUpdated, watch } from 'vue'
+import regex_like from '@autotrof/regex-like'
 
 const props = defineProps({
 	id: {
@@ -194,6 +195,7 @@ const options = ref({
 
 
 // METHOD
+
 function manageColumn() {
 	columns_html.value=[]
 	const all_headers=table.value?.querySelector('thead tr')?.querySelectorAll('td,th')||[]
@@ -256,7 +258,6 @@ function sortData(column_index) {
 	}
 }
 
-
 // COMPUTED
 const storage_key = computed(() => {
 	return `TABLE-${window.location.href}-${props.id||Math.random()}`
@@ -267,12 +268,22 @@ const current_page = computed(() => {
 })
 
 const data_shown = computed(() => {
-	let { data } = options.value
-	// if (options.value.searching && options.value.search && local_data.value) {
-	// 	data = data.filter(d => {
+	let data = JSON.parse(JSON.stringify(options.value.data))
+	if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null && local_data.value) {
+		const regex = regex_like(options.value.search)
 
-	// 	})
-	// }
+		data = data.filter((obj, index) => {
+			for (let value of Object.values(obj)) {
+				if (typeof value == 'number') {
+					value += ''
+				}
+				if (typeof value != 'string') continue
+				if (regex.test(value)) {
+					return true
+				}
+			}
+		})
+	}
 	if (options.value.paging && local_data.value) {
 		data = data.slice((current_page.value - 1) * options.value.pageLength, options.value.pageLength * current_page.value)
 	}
