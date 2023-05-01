@@ -97,6 +97,24 @@
 	.datatable-wrapper .top-section .paging-section select {
 		margin: 0 7px;
 	}
+	.datatable-wrapper .backdrop-loading {
+		width: 100%;
+		height: 100%;
+		position: absolute;
+		top: 0;
+		left: 0;
+		background-color: #06050536;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+	}
+	.input-search, .input-display-length {
+		border: 1px solid lightgray;
+	}
+	.input-search:focus, .input-display-length:focus {
+		outline: none;
+	}
 </style>
 
 <style>
@@ -104,20 +122,33 @@
 		margin-right: 3px;
 		stroke: rgb(109, 109, 109);
 	}
+	@keyframes rotation {
+		from {
+			transform: rotate(359deg);
+		}
+		to {
+			transform: rotate(0deg);
+		}
+	}
+	.datatable-wrapper .backdrop-loading svg {
+		width: 100px;
+		height: 100px;
+		animation: rotation 2s infinite linear;
+	}
 </style>
 
 <template>
 	<div class="datatable-wrapper">
 		<div class="top-section" v-if="options.paging || options.searching">
 			<div class="paging-section" v-if="options.paging">
-				Menampilkan
-				<select v-model="options.pageLength">
+				{{ displayLengthMenu[0] || '' }}
+				<select v-if="displayLengthMenu[2]" v-model="options.pageLength" class="input-display-length">
 					<option v-for="(page_length, length_menu_index) in options.lengthMenu[0]" :key="page_length" :value="page_length">{{ options.lengthMenu[1][length_menu_index] }}</option>
 				</select>
-				Data
+				{{ displayLengthMenu[1] || '' }}
 			</div>
 			<div class="search-section" v-if="options.searching">
-				Pencarian <input type="text" v-model="options.search" placeholder="pencarian">
+				{{ options.language.search }} <input type="text" v-model="options.search" class="input-search">
 			</div>
 		</div>
 
@@ -133,24 +164,26 @@
 
 			<tbody>
 				<!-- kalau bukan data lokal, biar parent yang proses datanya -->
-				<slot v-if="options.data.length>0 || loading" :data="data_shown"/>
+				<slot v-if="data_shown.length > 0 || loading" :data="data_shown"/>
 				<!-- terakhir, kalau ga ada datanya -->
 				<tr v-else>
 					<td colspan="columns_html.length" class="data-not-found">
-						Data Not Found
+						{{ options.search ? options.language.zeroRecords : options.language.infoEmpty }}
 					</td>
 				</tr>
 			</tbody>
 		</table>
 
+		<div class="backdrop-loading" v-if="loading" v-html="options.language.processing"></div>
+
 		<div class="bottom-section" v-if="options.info || options.paging">
-			<span v-if="options.info" class="info">{{ info }}</span>
+			<span v-if="options.info" class="info">{{ info }} {{ info_filtered }}</span>
 			<div class="pagination" v-if="options.paging">
-				<button :disabled="options.page <= 1" @click="firstPage()" type="button"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevrons-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M11 7l-5 5l5 5"></path><path d="M17 7l-5 5l5 5"></path></svg></button>
-				<button :disabled="options.page <= 1" @click="prevPage()" type="button"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-caret-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M14 6l-6 6l6 6v-12"></path></svg></button>
+				<button :disabled="options.page <= 1" @click="firstPage()" type="button" v-html="options.language.paginate.first"></button>
+				<button :disabled="options.page <= 1" @click="prevPage()" type="button" v-html="options.language.paginate.previous"></button>
 				<input type="number" :max="max_page" :min="1" v-model="options.page">
-				<button :disabled="options.page >= max_page" @click="nextPage()" type="button"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-caret-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M10 18l6 -6l-6 -6v12"></path></svg></button>
-				<button :disabled="options.page >= max_page" @click="lastPage()" type="button"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevrons-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7l5 5l-5 5"></path><path d="M13 7l5 5l-5 5"></path></svg></button>
+				<button :disabled="options.page >= max_page" @click="nextPage()" type="button" v-html="options.language.paginate.next"></button>
+				<button :disabled="options.page >= max_page" @click="lastPage()" type="button" v-html="options.language.paginate.last"></button>
 			</div>
 		</div>
 	</div>
@@ -176,6 +209,13 @@ const table = ref(null)
 const columns_html = ref([])
 const loading = ref(true)
 const local_data = ref(true)
+const response_data = ref({
+	data: [],
+	recordsTotal: 0,
+	recordsFiltered: 0,
+	draw: 0
+})
+const local_records_filtered = ref(0)
 const options = ref({
 	tableClassName: 'default-table',
 	data: [],
@@ -190,7 +230,22 @@ const options = ref({
 	search: '',
 	order: [[0, 'asc']],
 	initComplete: null,
-	info: true
+	info: true,
+	language: {
+		info: 			"Showing _START_ to _END_ of _TOTAL_ entries",
+		infoEmpty: 		"Showing 0 to 0 of 0 entries",
+		infoFiltered: 	"(filtered from _MAX_ total entries)",
+		lengthMenu: 	"Show _MENU_ entries",
+		processing: 	`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-refresh-dot" width="64" height="64" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>`,
+		search: 		"Search:",
+		zeroRecords: 	"No matching records found",
+		paginate: {
+			first: 		`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevrons-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M11 7l-5 5l5 5"></path><path d="M17 7l-5 5l5 5"></path></svg>`,
+			last: 		`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevrons-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M7 7l5 5l-5 5"></path><path d="M13 7l5 5l-5 5"></path></svg>`,
+			next: 		`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M9 6l6 6l-6 6"></path></svg>`,
+			previous: 	`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M15 6l-6 6l6 6"></path></svg>`
+		}
+	}
 })
 
 
@@ -219,7 +274,7 @@ function getHeaderHtml(index) {
 }
 
 function getData() {
-	loading.value=true
+	loading.value = true
 }
 
 function isColumnSortable(column) {
@@ -259,6 +314,33 @@ function sortData(column_index) {
 }
 
 // COMPUTED
+const displayLengthMenu = computed(() => {
+	const text = options.value.language.lengthMenu
+	if (text.includes('_MENU_')) {
+		const fist_part = text.substring(0, text.indexOf('_MENU_')).trim()
+		const second_part = text.substring(text.indexOf('_MENU_') + 6).trim()
+		return [fist_part, second_part, true]
+	} else {
+		return ['', '', false]
+	}
+})
+
+const count_records_total = computed(() => {
+	if (local_data.value) {
+		return options.value.data.length
+	} else {
+		return response_data.value.recordsTotal
+	}
+})
+
+const count_records_filtered = computed(() => {
+	if (local_data.value) {
+		return local_records_filtered.value
+	} else {
+		return response_data.value.recordsFiltered
+	}
+})
+
 const storage_key = computed(() => {
 	return `TABLE-${window.location.href}-${props.id||Math.random()}`
 })
@@ -269,21 +351,25 @@ const current_page = computed(() => {
 
 const data_shown = computed(() => {
 	let data = JSON.parse(JSON.stringify(options.value.data))
-	if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null && local_data.value) {
-		const regex = regex_like(options.value.search)
+	if (local_data.value) {
+		if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null) {
+			const regex = regex_like(options.value.search)
 
-		data = data.filter((obj, index) => {
-			for (let value of Object.values(obj)) {
-				if (typeof value == 'number') {
-					value += ''
+			data = data.filter((obj, index) => {
+				for (let value of Object.values(obj)) {
+					if (typeof value == 'number') {
+						value += ''
+					}
+					if (typeof value != 'string') continue
+					if (regex.test(value)) {
+						return true
+					}
 				}
-				if (typeof value != 'string') continue
-				if (regex.test(value)) {
-					return true
-				}
-			}
-		})
+			})
+		}
+		local_records_filtered.value = data.length
 	}
+
 	if (options.value.paging && local_data.value) {
 		data = data.slice((current_page.value - 1) * options.value.pageLength, options.value.pageLength * current_page.value)
 	}
@@ -291,21 +377,18 @@ const data_shown = computed(() => {
 })
 
 const info = computed(() => {
-	return `menampilkan ${current_data_length_state.value} dari ${options.value.data.length} data`
+	const start = (options.value.page - 1) * options.value.pageLength + 1
+	const end = options.value.pageLength != -1 ? start + data_shown.value.length - 1 : count_records_filtered.value
+	return options.value.language.info.replace('_START_', start).replace('_END_', end).replace('_TOTAL_', count_records_filtered.value)
+})
+
+const info_filtered = computed(() => {
+	return options.value.language.infoFiltered.replace('_MAX_', count_records_total.value)
 })
 
 const max_page = computed(() => {
-	return Math.ceil(options.value.data.length / options.value.pageLength)
+	return Math.ceil(count_records_filtered.value / options.value.pageLength)
 })
-
-const current_data_length_state = computed(() => {
-	let page_length = options.value.pageLength
-	if (options.value.pageLength == -1) {
-		page_length = options.value.data.length
-	}
-	return `${data_shown.value.length}/${page_length}`
-})
-
 
 watch([() => options.value.pageLength, () => options.value.search] , () => options.value.page = 1)
 
@@ -323,9 +406,19 @@ onBeforeMount(() => {
 	}
 
 	getData()
+
+	const props_options = props.options
+	if (props.options?.language) {
+		options.value.language = {
+			...options.value.language,
+			...props_options.language
+		}
+		delete props_options.language
+	}
+
 	options.value = {
 		...options.value,
-		...props.options,
+		...props_options,
 		...storageOptions
 	}
 })
@@ -334,6 +427,7 @@ onMounted(() => {
 	manageColumn()
 	if (props.options.data) {
 		options.value.data = props.options.data
+		loading.value = false
 	} else {
 		local_data.value = false
 	}
