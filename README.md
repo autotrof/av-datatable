@@ -6,7 +6,7 @@ This is Vue3 component that can render a table like datatable without jquery
 
 - import AvDatatable from 'av-datatable'
 - use it inside your component
-- example
+- example OFFLINE DATA
 ```
 <template>
   ...your code
@@ -20,17 +20,15 @@ This is Vue3 component that can render a table like datatable without jquery
       <th>Harga Jual</th>
       <th>Margin</th>
     </template>
-    <template v-slot="{data}">
-      <tr v-for="(d, index) in data" :key="index" @click="trClicked(index)">
-        <td>{{ d.gambar }}</td>
-        <td>{{ d.name }}</td>
-        <td>{{ d.kategori }}</td>
-        <td>{{ d.total_stock }}</td>
-        <td>{{ d.harga_beli }}</td>
-        <td></td>
-        <td></td>
-      </tr>
-    </template>
+    <tr v-for="(d, index) in data" :key="index" @click="trClicked(index)" class="table-danger">
+		<td>{{ d.gambar }}</td>
+		<td>{{ d.name }}</td>
+		<td>{{ d.kategori }}</td>
+		<td>{{ d.total_stock }}</td>
+		<td>{{ d.harga_beli }}</td>
+		<td></td>
+		<td></td>
+	</tr>
   </AvDatatable>
   ... another code
 </template>
@@ -41,6 +39,20 @@ import 'av-datatable/style.css'
 
 function trClicked(index) {
   console.log('tr ' + index + 'clicked. yeay')
+}
+
+let data = your array data write here
+const table_options = {
+	tableClassName: 'table table-hover table-striped',
+	stateSave: false,
+	language: {
+		lengthMenu: "Menampilkan _MENU_ data tiap halaman",
+		infoEmpty: "Tidak ada data yang bisa ditampilkan",
+		zeroRecords: "Data tidak ditemukan",
+		search: "Cari:",
+		info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+		infoFiltered: "(difilter dari _MAX_ total keseluruhan data)",
+	}
 }
 </script>
 ```
@@ -53,7 +65,12 @@ properties :
   	id: '',
   	options: {
 		tableClassName: 'default-table',
-		data: [],
+		ajax: {
+			url: null,
+			type: "GET",
+			data: {}
+		},
+		fixedHeader: true,
 		paging: true,
 		searching: true,
 		ordering: true,
@@ -90,5 +107,4 @@ property id is required when options.stateSave = true
 
 ### TODO
 - add ajax
-- add filter
 - add another properties to be look like datatable

@@ -8,7 +8,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, "src/index.js"),
       name: "av-datatable",
-      fileName: format => `av-datatable.${format}.js`
+      fileName: format => `av-datatable.${format}.min.js`
     },
     rollupOptions: {
       external: ['vue'],
@@ -17,7 +17,8 @@ export default defineConfig({
           vue: "Vue"
         }
       }
-    }
+    },
+	minify: 'esbuild'
   },
   plugins: [vue()],
 })

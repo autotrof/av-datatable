@@ -1,6 +1,6 @@
 {
   "name": "@autotrof/av-datatable",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "files": [
     "dist/*"
   ],
@@ -9,8 +9,8 @@
   "module": "./dist/av-datatable.es.js",
   "exports": {
     ".": {
-      "import": "./dist/av-datatable.es.js",
-      "require": "./dist/av-datatable.umd.js"
+      "import": "./dist/av-datatable.es.min.js",
+      "require": "./dist/av-datatable.umd.min.js"
     },
     "./dist/style.css": "./dist/style.css"
   },
@@ -20,7 +20,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@autotrof/regex-like": "^0.0.1",
+    "@autotrof/regex-like": "^1.0.0",
     "vue": "^3.2.47"
   },
   "devDependencies": {

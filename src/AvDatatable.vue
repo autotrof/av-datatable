@@ -16,6 +16,9 @@
 		color: whitesmoke;
 		font-weight: 500;
 	}
+	table thead tr th {
+		user-select: none;
+	}
 	table thead tr th[data-sortable='true'] {
 		cursor: pointer;
 	}
@@ -135,6 +138,10 @@
 		height: 100px;
 		animation: rotation 2s infinite linear;
 	}
+	.__hideme {
+		display: none;
+		z-index: 0;
+	}
 </style>
 
 <template>
@@ -158,19 +165,12 @@
 					<slot name="header"></slot>
 				</tr>
 				<tr v-else>
-					<th v-for="(column, index) in columns_html" :key="index" v-html="getHeaderHtml(index)" :data-sortable="column.sortable" @click="sortData(index)"/>
+					<th v-for="(column, index) in columns_html" :key="index" v-html="header_html[index]" :data-sortable="column.sortable" @click="sortData(index)"/>
 				</tr>
 			</thead>
 
 			<tbody>
-				<!-- kalau bukan data lokal, biar parent yang proses datanya -->
-				<slot v-if="data_shown.length > 0 || loading" :data="data_shown"/>
-				<!-- terakhir, kalau ga ada datanya -->
-				<tr v-else>
-					<td colspan="columns_html.length" class="data-not-found">
-						{{ options.search ? options.language.zeroRecords : options.language.infoEmpty }}
-					</td>
-				</tr>
+				<slot v-if="managed_local_data.length == 0"></slot>
 			</tbody>
 		</table>
 
@@ -190,9 +190,10 @@
 </template>
 
 <script setup>
-import { ref, onBeforeMount, onMounted, computed, nextTick, onUpdated, watch } from 'vue'
+import { ref, onBeforeMount, onMounted, computed, nextTick, onUpdated, watch, useSlots, render, h } from 'vue'
 import regex_like from '@autotrof/regex-like'
 
+const slots = useSlots()
 const props = defineProps({
 	id: {
 		type: String,
@@ -216,9 +217,17 @@ const response_data = ref({
 	draw: 0
 })
 const local_records_filtered = ref(0)
+const managed_local_data = ref([])
+const vdoms = ref([])
+
 const options = ref({
 	tableClassName: 'default-table',
-	data: [],
+	ajax: {
+		url: null,
+		type: "GET",
+		data: {}
+	},
+	fixedHeader: true,
 	paging: true,
 	searching: true,
 	ordering: true,
@@ -250,27 +259,16 @@ const options = ref({
 
 
 // METHOD
-
 function manageColumn() {
-	columns_html.value=[]
-	const all_headers=table.value?.querySelector('thead tr')?.querySelectorAll('td,th')||[]
-	for(let i = 0; i < all_headers.length; i++) {
+	const all_headers = table.value?.querySelector('thead tr')?.querySelectorAll('td,th') || []
+	for (let i = 0; i < all_headers.length; i++) {
 		let sortable = true
-		if(options.value.order[0][0] == i && isColumnSortable(all_headers[i]) === false) {
+		if (options.value.order[0][0] == i && isColumnSortable(all_headers[i]) === false) {
 			sortable = false
 			options.value.order[0][0]++
 		}
-		columns_html.value.push({elm: all_headers[i], sortable})
+		columns_html.value.push({elm: all_headers[i].innerHTML, sortable})
 	}
-}
-
-function getHeaderHtml(index) {
-	if(index == options.value.order[0][0]&&options.value.order[0][1]=='asc') {
-		return `<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-sort-ascending sort-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="white" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><line x1="4" y1="6" x2="11" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="13" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>` + columns_html.value[index].elm.innerHTML
-	} else if(index==options.value.order[0][0]&&options.value.order[0][1]=='desc') {
-		return `<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-sort-descending sort-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="white" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><line x1="4" y1="6" x2="13" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="11" y2="18"></line><polyline points="15 15 18 18 21 15"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>` + columns_html.value[index].elm.innerHTML
-	}
-	return columns_html.value[index].elm.innerHTML
 }
 
 function getData() {
@@ -309,11 +307,25 @@ function sortData(column_index) {
 		if (current_order_column == column_index) {
 			new_order_dir = options.value.order[0][1] == 'asc' ? 'desc' : 'asc'
 		}
-		options.value.order = [new_order_column, new_order_dir]
+		options.value.order = [[new_order_column, new_order_dir]]
 	}
 }
 
 // COMPUTED
+const header_html = computed(() => {
+	let columns = []
+	for (let index in columns_html.value) {
+		if (index == options.value.order[0][0] && options.value.order[0][1] == 'asc') {
+			columns.push(`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-sort-ascending sort-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="white" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><line x1="4" y1="6" x2="11" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="13" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>` + columns_html.value[index].elm)
+		} else if(index == options.value.order[0][0] && options.value.order[0][1] == 'desc') {
+			columns.push(`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-sort-descending sort-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="white" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><line x1="4" y1="6" x2="13" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="11" y2="18"></line><polyline points="15 15 18 18 21 15"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>` + columns_html.value[index].elm)
+		} else {
+			columns.push(columns_html.value[index].elm)
+		}
+	}
+	return columns
+})
+
 const displayLengthMenu = computed(() => {
 	const text = options.value.language.lengthMenu
 	if (text.includes('_MENU_')) {
@@ -327,7 +339,7 @@ const displayLengthMenu = computed(() => {
 
 const count_records_total = computed(() => {
 	if (local_data.value) {
-		return options.value.data.length
+		return options.value.data?.length || 0
 	} else {
 		return response_data.value.recordsTotal
 	}
@@ -350,28 +362,47 @@ const current_page = computed(() => {
 })
 
 const data_shown = computed(() => {
-	let data = JSON.parse(JSON.stringify(options.value.data))
-	if (local_data.value) {
-		if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null) {
-			const regex = regex_like(options.value.search)
+	let data = JSON.parse(JSON.stringify(managed_local_data.value))
 
-			data = data.filter((obj, index) => {
-				for (let value of Object.values(obj)) {
-					if (typeof value == 'number') {
-						value += ''
-					}
-					if (typeof value != 'string') continue
-					if (regex.test(value)) {
-						return true
-					}
+	// LOCAL DATA FILTERING
+	if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null) {
+		const regex = regex_like(options.value.search)
+		data = data.filter((obj, index) => {
+			for (let value of obj.data) {
+				if (typeof value == 'number') {
+					value += ''
 				}
-			})
-		}
-		local_records_filtered.value = data.length
+				if (typeof value != 'string') continue
+				if (regex.test(value)) {
+					return true
+				}
+			}
+		})
+	}
+
+	local_records_filtered.value = data.length
+
+	// LOCAL DATA SORTING
+	const order = options.value.order
+	if (order[0][0] < columns_html.value.length && order[0][0] >= 0) {
+		data.sort((a, b) => {
+			if ( a.data[order[0][0]] < b.data[order[0][0]] ) return order[0][1] == 'asc' ? -1 : 1
+			if ( a.data[order[0][0]] > b.data[order[0][0]] ) return order[0][1] == 'asc' ? 1 : -1
+			return 0
+		})
 	}
 
 	if (options.value.paging && local_data.value) {
 		data = data.slice((current_page.value - 1) * options.value.pageLength, options.value.pageLength * current_page.value)
+	}
+	let indexes = data.map(d=>parseInt(d.index))
+	let new_vdoms = []
+	for (let vdom of vdoms.value) {
+		if (indexes.includes(vdom.key)) new_vdoms.push(vdom)
+	}
+	if (table.value) {
+		let tbody = h('tbody',new_vdoms)
+		render(tbody, table.value)
 	}
 	return data
 })
@@ -393,6 +424,7 @@ const max_page = computed(() => {
 watch([() => options.value.pageLength, () => options.value.search] , () => options.value.page = 1)
 
 onBeforeMount(() => {
+	// state save. belum
 	let storageOptions = {}
 	if (props.options?.stateSave) {
 		if (!props.id?.trim()) {
@@ -405,8 +437,7 @@ onBeforeMount(() => {
 		}
 	}
 
-	getData()
-
+	// gabungin semua data
 	const props_options = props.options
 	if (props.options?.language) {
 		options.value.language = {
@@ -425,8 +456,23 @@ onBeforeMount(() => {
 
 onMounted(() => {
 	manageColumn()
-	if (props.options.data) {
-		options.value.data = props.options.data
+
+	if (!props.options.ajax?.url) {
+		const tr_elms = table.value.querySelectorAll('tbody tr')
+		const body_slot = slots.default()
+
+		let ld = []
+		for (const index in body_slot[0].children) {
+			render(body_slot[index], table.value.querySelector('tbody'))
+			const vdom = body_slot[0].children[index]
+			vdoms.value.push(vdom)
+			let data = []
+			for (let index_td in vdom.children) {
+				data.push(tr_elms[index].querySelectorAll(`td,th`)[index_td].innerText)
+			}
+			ld.push({index, data})
+		}
+		managed_local_data.value = ld
 		loading.value = false
 	} else {
 		local_data.value = false
