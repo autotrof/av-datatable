@@ -44,7 +44,8 @@ function trClicked(index) {
 let data = your array data write here
 const table_options = {
 	tableClassName: 'table table-hover table-striped',
-	stateSave: false,
+	stateSave: true,
+	fixedHeader: true,
 	language: {
 		lengthMenu: "Menampilkan _MENU_ data tiap halaman",
 		infoEmpty: "Tidak ada data yang bisa ditampilkan",

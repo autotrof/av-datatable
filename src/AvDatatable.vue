@@ -3,6 +3,7 @@
 		width: 100%;
 	}
 	table.default-table {
+		position: relative;
 		border-collapse: collapse;
 		width: 100%;
 	}
@@ -118,6 +119,10 @@
 	.input-search:focus, .input-display-length:focus {
 		outline: none;
 	}
+	.header-sticky {
+		position: sticky;
+		top: 0;
+	}
 </style>
 
 <style>
@@ -137,10 +142,6 @@
 		width: 100px;
 		height: 100px;
 		animation: rotation 2s infinite linear;
-	}
-	.__hideme {
-		display: none;
-		z-index: 0;
 	}
 </style>
 
@@ -165,7 +166,7 @@
 					<slot name="header"></slot>
 				</tr>
 				<tr v-else>
-					<th v-for="(column, index) in columns_html" :key="index" v-html="header_html[index]" :data-sortable="column.sortable" @click="sortData(index)"/>
+					<th v-for="(column, index) in columns_html" :key="index" v-html="header_html[index]" :data-sortable="column.sortable" @click="sortData(index)" :class="{'header-sticky': options.fixedHeader}"/>
 				</tr>
 			</thead>
 
@@ -227,7 +228,7 @@ const options = ref({
 		type: "GET",
 		data: {}
 	},
-	fixedHeader: true,
+	fixedHeader: false,
 	paging: true,
 	searching: true,
 	ordering: true,
@@ -339,7 +340,7 @@ const displayLengthMenu = computed(() => {
 
 const count_records_total = computed(() => {
 	if (local_data.value) {
-		return options.value.data?.length || 0
+		return managed_local_data.value?.length || 0
 	} else {
 		return response_data.value.recordsTotal
 	}
@@ -424,16 +425,14 @@ const max_page = computed(() => {
 watch([() => options.value.pageLength, () => options.value.search] , () => options.value.page = 1)
 
 onBeforeMount(() => {
-	// state save. belum
 	let storageOptions = {}
 	if (props.options?.stateSave) {
 		if (!props.id?.trim()) {
-			const msg = "property Id harus diisi jika options.stateSave = true\nid diperlukan untuk mengidentifikasi table yang akan disimpan statenya"
-			alert(msg)
+			const msg = "property Id is required if options.stateSave = true"
 			throw msg
 		}
 		if (localStorage.getItem(storage_key.value)) {
-			storageOptions = JSON.parse(localStorage.getItem(storage_key)) || {}
+			storageOptions = JSON.parse(localStorage.getItem(storage_key.value)) || {}
 		}
 	}
 
@@ -490,7 +489,7 @@ onUpdated(() => {
 		localStorage.setItem(storage_key.value, JSON.stringify({
 			page: options.value.page || 1,
 			order: options.value.order,
-			pageLength: options.value.pageLength || 10
+			pageLength: options.value.pageLength || options.value.lengthMenu[0][0] || 10
 		}))
 	}
 })
