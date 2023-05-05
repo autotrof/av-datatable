@@ -4,12 +4,17 @@ This is Vue3 component that can render a table like datatable without jquery
 Unlike the other table libraries, av-datatable keeping the reactivity & the listener.
 it's compatible with yajra datatable also
 
+### installation
+```
+npm i @autotrof/av-datatable
+```
+
 ## How To Use
 
 - import AvDatatable from 'av-datatable'
 - use it inside your component
 
-## EXAMPLE FOR OFFLINE DATA
+## Example Render Client Side
 ```
 <template>
   ...your code
@@ -64,7 +69,7 @@ const table_options = {
 ```
 this component will automatically render pagination and add filtering in your table
 
-## EXAMPLE FOR ONLINE DATA
+## Example Using Ajax (Server Side)
 
 ```
 <template>
@@ -113,7 +118,7 @@ const table_options = {
 </script>
 ```
 
-## OPTIONS
+## Options
 
 ```
 {
@@ -154,8 +159,9 @@ const table_options = {
 }
 ```
 
-## NOTE
+## Note
 property id is required when options.stateSave = true
+add data-sortable="false" at th element if the column is not sortable
 
-### TODO
+### Todo
 - add another properties to be look like datatable

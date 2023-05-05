@@ -183,7 +183,7 @@
 			<div class="pagination" v-if="options.paging">
 				<button :disabled="options.page <= 1" @click="firstPage()" type="button" v-html="options.language.paginate.first"></button>
 				<button :disabled="options.page <= 1" @click="prevPage()" type="button" v-html="options.language.paginate.previous"></button>
-				<input type="number" :max="max_page" :min="1" v-model="options.page">
+				<input type="number" @input="getDataWait" :max="max_page" :min="1" v-model="options.page">
 				<button :disabled="options.page >= max_page" @click="nextPage()" type="button" v-html="options.language.paginate.next"></button>
 				<button :disabled="options.page >= max_page" @click="lastPage()" type="button" v-html="options.language.paginate.last"></button>
 			</div>
@@ -223,7 +223,6 @@ const response_data = ref({
 const local_records_filtered = ref(0)
 const managed_local_data = ref([])
 const vdoms = ref([])
-
 const options = ref({
 	tableClassName: 'default-table',
 	ajax: {
@@ -264,11 +263,14 @@ const options = ref({
 
 // METHOD
 function manageColumn() {
+	const header_slot = slots.header()
 	const all_headers = table.value?.querySelector('thead tr')?.querySelectorAll('td,th') || []
+
+	const isColumnSortable = column => column.dataset.sortable === 'false' ? false : true
+
 	for (let i = 0; i < all_headers.length; i++) {
-		let sortable = true
-		if (options.value.order[0][0] == i && isColumnSortable(all_headers[i]) === false) {
-			sortable = false
+		let sortable = isColumnSortable(all_headers[i])
+		if (options.value.order[0][0] === i && !sortable) {
 			options.value.order[0][0]++
 		}
 		columns_html.value.push({elm: all_headers[i].innerHTML, sortable})
@@ -284,9 +286,15 @@ function getData() {
 		},
 		start: (options.value.page - 1) * options.value.pageLength,
 		length: options.value.pageLength,
-		draw: response_data.value.draw
+		draw: response_data.value.draw,
+		order: [
+			{
+				column: options.value.order[0][0],
+				dir: options.value.order[0][1],
+			}
+		]
 	}
-	console.log(data,'data')
+
 	let opt = {
 		url: options.value.ajax.url,
 		method: options.value.ajax.method || 'GET',
@@ -303,29 +311,44 @@ function getData() {
 	})
 	.catch(e => {
 		loading.value = false
-		console.log(e,'error')
+		console.log(e,'error @autotrof/av-datatable')
 	})
-}
-
-function isColumnSortable(column) {
-	if (column.dataset.sortable === 'false') return false
-	return true
 }
 
 function firstPage() {
 	if (options.value.page > 1) options.value.page = 1
+	if (!local_data.value) {
+		nextTick(() => {
+			getData()
+		})
+	}
 }
 
 function prevPage() {
 	if (options.value.page > 1) options.value.page--
+	if (!local_data.value) {
+		nextTick(() => {
+			getData()
+		})
+	}
 }
 
 function nextPage() {
 	if (options.value.page < max_page.value) options.value.page++
+	if (!local_data.value) {
+		nextTick(() => {
+			getData()
+		})
+	}
 }
 
 function lastPage() {
 	options.value.page = max_page.value
+	if (!local_data.value) {
+		nextTick(() => {
+			getData()
+		})
+	}
 }
 
 function sortData(column_index) {
@@ -478,17 +501,22 @@ watch([
 		if (options.value.page != 1) {
 			options.value.page = 1
 		}
-		nextTick(() => {
-			getDataWait()
-		})
 })
 
-watch(()=>options.value.page, () => {
-	getData()
+watch([
+		() => options.value.pageLength,
+		() => options.value.search,
+		() => options.value.order
+	] ,
+	() => {
+		if (!local_data.value) {
+			getDataWait()
+		}
 })
 
 onBeforeMount(() => {
 	// STATE SAVE
+	const default_options = JSON.stringify(options.value)
 	let storageOptions = {}
 	if (props.options?.stateSave) {
 		if (!props.id?.trim()) {
@@ -502,10 +530,11 @@ onBeforeMount(() => {
 
 	const props_options = props.options
 
+	let new_options = options.value
 	// LANGUAGE
 	if (props.options?.language) {
-		options.value.language = {
-			...options.value.language,
+		new_options.language = {
+			...new_options.language,
 			...props_options.language
 		}
 		delete props_options.language
@@ -513,8 +542,8 @@ onBeforeMount(() => {
 
 	// AJAX
 	if (props.options?.ajax) {
-		options.value.ajax = {
-			...options.value.ajax,
+		new_options.ajax = {
+			...new_options.ajax,
 			...props_options.ajax
 		}
 		delete props_options.ajax
@@ -523,7 +552,7 @@ onBeforeMount(() => {
 
 	// COMBINING props.options dengan options default & storage options
 	options.value = {
-		...options.value,
+		...new_options,
 		...props_options,
 		...storageOptions
 	}
@@ -531,7 +560,10 @@ onBeforeMount(() => {
 	// cek apakah parameter ajax terisi. kl terisi berarti local_data = false
 	if (options.value.ajax?.url) {
 		local_data.value = false
-		getData()
+		// if same, then the watcher wont be run.
+		if (default_options == JSON.stringify(options.value) || options.value.stateSave == false) {
+			getData()
+		}
 	}
 })
 
@@ -544,7 +576,7 @@ onMounted(() => {
 
 		let ld = []
 		for (const index in body_slot[0].children) {
-			render(body_slot[index], table.value.querySelector('tbody'))
+			// render(body_slot[index], table.value.querySelector('tbody'))
 			const vdom = body_slot[0].children[index]
 			vdoms.value.push(vdom)
 			let data = []
