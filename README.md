@@ -1,8 +1,8 @@
 # av-datatable
 
-This is Vue3 component that can render a table like datatable without jquery
+This is Vue3 component that can render a table like datatable without jquery.
 Unlike the other table libraries, av-datatable keeping the reactivity & the listener.
-it's compatible with yajra datatable also
+it also compatible with yajra datatable
 
 ### installation
 ```
@@ -106,6 +106,9 @@ const table_options = {
 	tableClassName: 'table table-hover table-striped',
 	stateSave: true,
 	fixedHeader: true,
+	ajax: {
+		url: "http://localhost:3000/api/categories"
+	},
 	language: {
 		lengthMenu: "Menampilkan _MENU_ data tiap halaman",
 		infoEmpty: "Tidak ada data yang bisa ditampilkan",

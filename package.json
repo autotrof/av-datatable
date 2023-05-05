@@ -1,6 +1,6 @@
 {
   "name": "@autotrof/av-datatable",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "files": [
     "dist/*"
   ],
@@ -36,5 +36,6 @@
   "keywords": [
     "datatable",
     "vue"
-  ]
+  ],
+  "license": "MIT"
 }
