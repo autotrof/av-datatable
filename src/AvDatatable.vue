@@ -171,7 +171,8 @@
 			</thead>
 
 			<tbody>
-				<slot v-if="managed_local_data.length == 0"></slot>
+				<slot v-if="managed_local_data.length == 0 && local_data"></slot>
+				<slot v-else :data="data_shown"></slot>
 			</tbody>
 		</table>
 
@@ -193,6 +194,8 @@
 <script setup>
 import { ref, onBeforeMount, onMounted, computed, nextTick, onUpdated, watch, useSlots, render, h } from 'vue'
 import regex_like from '@autotrof/regex-like'
+import axios from 'axios'
+import debounce from 'underscore/modules/debounce'
 
 const slots = useSlots()
 const props = defineProps({
@@ -274,6 +277,34 @@ function manageColumn() {
 
 function getData() {
 	loading.value = true
+	let data = {
+		...options.value.ajax?.data,
+		search: {
+			value: options.value.search
+		},
+		start: (options.value.page - 1) * options.value.pageLength,
+		length: options.value.pageLength,
+		draw: response_data.value.draw
+	}
+	console.log(data,'data')
+	let opt = {
+		url: options.value.ajax.url,
+		method: options.value.ajax.method || 'GET',
+	}
+	if (opt.method.toLowerCase() == 'get') {
+		opt.params = data
+	} else {
+		opt.data = data
+	}
+	axios(opt)
+	.then(res => {
+		loading.value = false
+		response_data.value.data = res.data
+	})
+	.catch(e => {
+		loading.value = false
+		console.log(e,'error')
+	})
 }
 
 function isColumnSortable(column) {
@@ -363,68 +394,101 @@ const current_page = computed(() => {
 })
 
 const data_shown = computed(() => {
-	let data = JSON.parse(JSON.stringify(managed_local_data.value))
+	let data = []
+	if (local_data.value) {
+		data = JSON.parse(JSON.stringify(managed_local_data.value))
 
-	// LOCAL DATA FILTERING
-	if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null) {
-		const regex = regex_like(options.value.search)
-		data = data.filter((obj, index) => {
-			for (let value of obj.data) {
-				if (typeof value == 'number') {
-					value += ''
+		// LOCAL DATA FILTERING
+		if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null) {
+			const regex = regex_like(options.value.search)
+			data = data.filter((obj, index) => {
+				for (let value of obj.data) {
+					if (typeof value == 'number') {
+						value += ''
+					}
+					if (typeof value != 'string') continue
+					if (regex.test(value)) {
+						return true
+					}
 				}
-				if (typeof value != 'string') continue
-				if (regex.test(value)) {
-					return true
-				}
-			}
-		})
-	}
+			})
+		}
 
-	local_records_filtered.value = data.length
+		local_records_filtered.value = data.length
 
-	// LOCAL DATA SORTING
-	const order = options.value.order
-	if (order[0][0] < columns_html.value.length && order[0][0] >= 0) {
-		data.sort((a, b) => {
-			if ( a.data[order[0][0]] < b.data[order[0][0]] ) return order[0][1] == 'asc' ? -1 : 1
-			if ( a.data[order[0][0]] > b.data[order[0][0]] ) return order[0][1] == 'asc' ? 1 : -1
-			return 0
-		})
-	}
+		// LOCAL DATA SORTING
+		const order = options.value.order
+		if (order[0][0] < columns_html.value.length && order[0][0] >= 0) {
+			data.sort((a, b) => {
+				if ( a.data[order[0][0]] < b.data[order[0][0]] ) return order[0][1] == 'asc' ? -1 : 1
+				if ( a.data[order[0][0]] > b.data[order[0][0]] ) return order[0][1] == 'asc' ? 1 : -1
+				return 0
+			})
+		}
 
-	if (options.value.paging && local_data.value) {
-		data = data.slice((current_page.value - 1) * options.value.pageLength, options.value.pageLength * current_page.value)
-	}
-	let indexes = data.map(d=>parseInt(d.index))
-	let new_vdoms = []
-	for (let vdom of vdoms.value) {
-		if (indexes.includes(vdom.key)) new_vdoms.push(vdom)
-	}
-	if (table.value) {
-		let tbody = h('tbody',new_vdoms)
-		render(tbody, table.value)
+		if (options.value.paging && local_data.value) {
+			data = data.slice((current_page.value - 1) * options.value.pageLength, options.value.pageLength * current_page.value)
+		}
+		let indexes = data.map(d=>parseInt(d.index))
+		let new_vdoms = []
+		for (let vdom of vdoms.value) {
+			if (indexes.includes(vdom.key)) new_vdoms.push(vdom)
+		}
+		if (table.value) {
+			let tbody = h('tbody',new_vdoms)
+			render(tbody, table.value)
+		}
+	} else {
+		data = response_data.value.data
 	}
 	return data
 })
 
 const info = computed(() => {
 	const start = (options.value.page - 1) * options.value.pageLength + 1
-	const end = options.value.pageLength != -1 ? start + data_shown.value.length - 1 : count_records_filtered.value
-	return options.value.language.info.replace('_START_', start).replace('_END_', end).replace('_TOTAL_', count_records_filtered.value)
+	let end = 0
+	let total = 0
+	if (local_data.value) {
+		end = options.value.pageLength != -1 ? start + data_shown.value.length - 1 : count_records_filtered.value
+		total = count_records_filtered.value
+	} else {
+		end = options.value.pageLength != -1 ? start + data_shown.value?.data?.length - 1 : data_shown.value?.recordsFiltered
+		total = data_shown.value?.recordsFiltered
+	}
+	return options.value.language.info.replace('_START_', start).replace('_END_', end).replace('_TOTAL_', total)
 })
 
 const info_filtered = computed(() => {
-	return options.value.language.infoFiltered.replace('_MAX_', count_records_total.value)
+	const max = local_data.value ? count_records_total.value : (data_shown.value?.recordsTotal)
+	return options.value.language.infoFiltered.replace('_MAX_', max)
 })
 
 const max_page = computed(() => {
-	return Math.ceil(count_records_filtered.value / options.value.pageLength)
+	if (local_data.value) return Math.ceil(count_records_filtered.value / options.value.pageLength)
+	return Math.ceil(data_shown.value?.recordsFiltered / options.value.pageLength)
 })
 
-watch([() => options.value.pageLength, () => options.value.search] , () => options.value.page = 1)
+const getDataWait = debounce(getData, 250)
+
+watch([
+		() => options.value.pageLength,
+		() => options.value.search
+	] ,
+	() => {
+		if (options.value.page != 1) {
+			options.value.page = 1
+		}
+		nextTick(() => {
+			getDataWait()
+		})
+})
+
+watch(()=>options.value.page, () => {
+	getData()
+})
 
 onBeforeMount(() => {
+	// STATE SAVE
 	let storageOptions = {}
 	if (props.options?.stateSave) {
 		if (!props.id?.trim()) {
@@ -436,8 +500,9 @@ onBeforeMount(() => {
 		}
 	}
 
-	// gabungin semua data
 	const props_options = props.options
+
+	// LANGUAGE
 	if (props.options?.language) {
 		options.value.language = {
 			...options.value.language,
@@ -446,17 +511,34 @@ onBeforeMount(() => {
 		delete props_options.language
 	}
 
+	// AJAX
+	if (props.options?.ajax) {
+		options.value.ajax = {
+			...options.value.ajax,
+			...props_options.ajax
+		}
+		delete props_options.ajax
+	}
+
+
+	// COMBINING props.options dengan options default & storage options
 	options.value = {
 		...options.value,
 		...props_options,
 		...storageOptions
 	}
+
+	// cek apakah parameter ajax terisi. kl terisi berarti local_data = false
+	if (options.value.ajax?.url) {
+		local_data.value = false
+		getData()
+	}
 })
 
 onMounted(() => {
 	manageColumn()
-
-	if (!props.options.ajax?.url) {
+	// kalau datanya lokal. kita manage sendiri
+	if (local_data.value) {
 		const tr_elms = table.value.querySelectorAll('tbody tr')
 		const body_slot = slots.default()
 
@@ -473,20 +555,19 @@ onMounted(() => {
 		}
 		managed_local_data.value = ld
 		loading.value = false
-	} else {
-		local_data.value = false
-	}
 
-	if (options.value.initComplete != null) {
-		nextTick(() => {
-			options.value.initComplete(options.value)
-		})
+		if (options.value.initComplete != null) {
+			nextTick(() => {
+				options.value.initComplete(options.value)
+			})
+		}
 	}
 })
 
 onUpdated(() => {
 	if (options.value.stateSave) {
 		localStorage.setItem(storage_key.value, JSON.stringify({
+			search: options.value.search || '',
 			page: options.value.page || 1,
 			order: options.value.order,
 			pageLength: options.value.pageLength || options.value.lengthMenu[0][0] || 10
