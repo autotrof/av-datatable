@@ -143,6 +143,22 @@
 		height: 100px;
 		animation: rotation 2s infinite linear;
 	}
+	.datatable-wrapper table .__sort {
+		width: 18px;
+		height: 18px;
+		margin-right: 3px;
+		margin-top: -3px;
+	}
+	.datatable-wrapper table thead .__sortable {
+		cursor: pointer;
+		transition: .2s;
+	}
+	.datatable-wrapper table thead .__sortable:hover {
+		filter: brightness(0.9);
+	}
+	.datatable-wrapper table thead .__middle {
+		vertical-align: middle;
+	}
 </style>
 
 <template>
@@ -161,18 +177,15 @@
 		</div>
 
 		<table ref="table" :class="options.tableClassName">
-			<thead>
-				<tr v-if="columns_html.length == 0">
+			<thead v-if="!processed_header">
+				<tr>
 					<slot name="header"></slot>
 				</tr>
-				<tr v-else>
-					<th v-for="(column, index) in columns_html" :key="index" v-html="header_html[index]" :data-sortable="column.sortable" @click="sortData(index)" :class="{'header-sticky': options.fixedHeader}"/>
-				</tr>
 			</thead>
-
+			<thead ref="thead" v-else></thead>
 			<tbody>
 				<slot v-if="managed_local_data.length == 0 && local_data"></slot>
-				<slot v-else :data="data_shown"></slot>
+				<slot v-else-if="!local_data" :data="response_data"></slot>
 			</tbody>
 		</table>
 
@@ -192,9 +205,8 @@
 </template>
 
 <script setup>
-import { ref, onBeforeMount, onMounted, computed, nextTick, onUpdated, watch, useSlots, render, h } from 'vue'
+import { ref, onBeforeMount, onMounted, computed, nextTick, onUpdated, watch, useSlots, render, h, createTextVNode } from 'vue'
 import regex_like from '@autotrof/regex-like'
-import axios from 'axios'
 import debounce from 'underscore/modules/debounce'
 
 const slots = useSlots()
@@ -211,7 +223,6 @@ const props = defineProps({
 })
 
 const table = ref(null)
-const columns_html = ref([])
 const loading = ref(true)
 const local_data = ref(true)
 const response_data = ref({
@@ -228,7 +239,16 @@ const options = ref({
 	ajax: {
 		url: null,
 		type: "GET",
-		data: {}
+		data: {},
+		mode: "cors", // no-cors, *cors, same-origin
+		cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+		credentials: "same-origin", // include, *same-origin, omit
+		headers: {
+      		"Content-Type": "application/json",
+      		// 'Content-Type': 'application/x-www-form-urlencoded',
+		},
+		redirect: "follow", // manual, *follow, error
+		referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
 	},
 	fixedHeader: false,
 	paging: true,
@@ -257,27 +277,87 @@ const options = ref({
 			next: 		`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M9 6l6 6l-6 6"></path></svg>`,
 			previous: 	`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M15 6l-6 6l6 6"></path></svg>`
 		}
+	},
+	sortIcon: {
+		asc: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAMAAAAJixmgAAAAb1BMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///9tVJtUAAAAI3RSTlMAAgMEBgcMU1dYi5GSoKGip6ipv8TN1tnc3uDh4vX29/r7/MbURHIAAAABYktHRCS0BvmZAAADSElEQVR42u2cW1fiMBRG6ciIFQel3uiIIPb//0efvGCTtE1P0nNg70fWIitbjrk1X2czAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBTZV6uN4dGhMNmXc7H9OXy5uWtad5ebi7T+S62jSjbRXxfrt8/W3m/TqRbLBtxlkVcXy4ef7byeJFEOIFv0yzj/vZPx608pzBeNEmIqeri/ncrD/LG8zqN8P+/w31v281U4sZlk4irwb7/XM3cSRtXqYQrEV954zqVcC3jK268TyW8F/KVNt6lEn6V8hU2VlHSYV9ZYw2DVpevqLGCaanbV9J4+oVHH19J46mXlv18JY2n3Tz09RU0nnR7WKz6N7oqxKp6sgOA/r+v8Mg10RHPMN8EO4nMDPW1bjzc17ZxjK9l4zhfu8ZD5qNUs5OF39fqbzzG16LxOF97xmN9rRmP97VlLOFryVjG145x/PxrdD4W3HwvLfiGDpRWvT8c8YQyM6Ejw7s/rk9D//IRTyhzU4Z8Z66Pg4PclXrhKjgEOYVDw1ylXrgODrlu4YBxrV54769nv7C/qvfqhXchX6+w1/jVaEl/LiG8wr6qrm0OWl9LJr+wx1j/oFX66zks7K5q/dOSY+Hx7RsUdhkbWHi0l5Y/twBBYUdVG1hatjYPR1uesHDL2MTm4dezyuOnjB3Cwe9qruqt7yljl3Dou6pHrnK9ObieMnYL+79rkh7CpwXCCCOMMMIII3wOwkqyh9mEtWQPMwnryR5mEtaTPcwjrCh7mEVYUfYwj7Ce7GEmYTXZw1zCWrKH2YSVZA/zCevIHlLSDFpMSyw8WFqyeTjX7eHZHQCc4REPp5YII4wwwggjjDDCCCOMMMIII4wwwggjjDDCCCOMMMIII4wwwggjjDDCCCOMMMJ2LqaNuaxm9uph7HVEw5dL4y6cWr4+HHWl2PQF8ZhL46YjADGxANshj4jgh+0YT0S0x3ZQKyK8ZTt7GJFHtJ09jMgj7kQSjIZKuhZJMBoatCqRBKOhaakUSTAaWni0+5Li3aSKlpbtviR5l6OezUOrL2neTapne5jt3aRaDgCO+5Ly3aRKjni++3Iy7yYFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOjNB45vKHvz0SPuAAAAAElFTkSuQmCC`,
+		desc: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAMAAAAJixmgAAAAb1BMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///9tVJtUAAAAI3RSTlMAAgMEBgcMU1dYi5GSoKGip6ipv8TQ1tnc3uDh4vX29/r7/BecCEUAAAABYktHRCS0BvmZAAADYElEQVR42u2cYXPTMAxAEzrWdh2lKwxWttFt+f//kQ0obMV241RSpPLex94l53fVxZZsuWkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE6Vs/nVzWOnxuPN1fysaixVT9QzvevUuZvWjqXvE9W0i86ERVs7lj5PDMDI93n81WNZqMRzZ8a0eiwKUX22sRP+9r52LIeeGMC8M2RWPZaZuPDaUnhdPZa1uPDGUnhTPZaNuPDWUnhbPZatuPB3S+H78lhSj5x0SJsIe/pomQh7mpZMhD0tPEyEPS0tbYQdJQ9Gwn7SQyNhPwUAM2EvJR47YScgjDDCCCOMMMIII4wwwggjjDDCCCOMMMIII4wwwggjjDDCCCOMMMIII4wwwgifrLDgwbRjugbDHj0c2jUY+HDpsK7ByMeHF36FlQ6IT70Ka7UADOkajN3kMXMqrNbGs3YqrNbUsnEqrNZ7uHUqrNZ7eE9I89FiWmLhwdKS5IH0kAIAJR6qlggjjDDCCCOMMMInI5y9m7SHsMW9pnqpyn6ScVjY4F5T3WT0bRp5SNjkXlPlcsOy7S/cLgWKDObxvC/02rgsvO+rcq+pQclwNekn3H4QKRQakyoK/zUuCSd8Ne41lSZZ9v8T1QXhf+N5YLHfmHQRfGecF077KtxrKk1mr/J3VGeFk/HcadxrKk1ur/KXcU445ztkh9JFSO+iOiOciecQIZ3fq3wxTgvnfQN8tAp7lc9RnRTOxnOIaam0V7mapH4t+QZYeBT3Kpe9f4yztBTdqwyRPJQ+QZUsY6SHxY9QDat3USoeMsZxfGWMI/lKGMfyPd44mu+xxvF8jzOO6HvMfBxl/pX6j2P+v8ON4/oOM47sO8RYynesg2m1xlK+4x09rDMW8h31cGnN7CQ1H417fLj/fywWzyMfEO9rLPa9Gr0FoJ+x2HzkoMmjj7Hc/OuhjeewseB6w0Wj1iFjyfWVj97D8uwkmh856T0s/cey62cvvYd5Y+F8wU3vYc5YOj/y03uYNhbPBx31HrYfE3Ein/866j1sP+2/5bNGvu+n97Bpv7x9y1eV+oaf3sOmmVy/fsv1RKnU4qX38IWLp91bni70iktOeg9/cn55+9B1D7eX5w0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAwP/ED+OLKGcQLl+wAAAAAElFTkSuQmCC`
 	}
 })
 
+const thead = ref(null)
+const the_tr = ref(null)
+const processed_header = ref(false)
+const render_times = ref(0)
 
 // METHOD
-function manageColumn() {
-	const header_slot = slots.header()
-	const all_headers = table.value?.querySelector('thead tr')?.querySelectorAll('td,th') || []
+function objectToQueryParams(obj) {
+  if (!obj) return ""
+  const query = [];
 
-	const isColumnSortable = column => column.dataset.sortable === 'false' ? false : true
+  function traverse(obj, prefix = '') {
+    for (const [key, value] of Object.entries(obj)) {
+      const newPrefix = prefix ? `${prefix}[${key}]` : key;
 
-	for (let i = 0; i < all_headers.length; i++) {
-		let sortable = isColumnSortable(all_headers[i])
-		if (options.value.order[0][0] === i && !sortable) {
-			options.value.order[0][0]++
-		}
-		columns_html.value.push({elm: all_headers[i].innerHTML, sortable})
-	}
+      if (value === null) {
+        query.push(`${encodeURIComponent(newPrefix)}=null`);
+      } else if (typeof value === 'object') {
+        traverse(value, newPrefix);
+      } else if (Array.isArray(value)) {
+        query.push(...value.map((val, i) => `${encodeURIComponent(newPrefix)}[${i}]=${encodeURIComponent(val)}`));
+      } else {
+        query.push(`${encodeURIComponent(newPrefix)}=${encodeURIComponent(value)}`);
+      }
+    }
+  }
+
+  traverse(obj);
+
+  return decodeURI(query.join('&'));
 }
 
-function getData() {
+function manageColumn() {
+	const header_slot = slots.header()
+
+	let list_th = []
+	for (let i = 0; i < header_slot.length; i++) {
+		const vdom_th = header_slot[i]
+		let th_props = vdom_th.props
+
+		if (!th_props) th_props = {}
+		if (!th_props.class) th_props.class = ""
+		if (th_props['data-sortable'] == undefined) th_props['data-sortable'] = 'true'
+
+
+		let sortable = !(th_props['data-sortable'] === 'false')
+		if (options.value.order[0][0] === i && !sortable) options.value.order[0][0]++
+
+		let new_children = []
+
+		if (options.value.order[0][0] == i) {
+			new_children.push(sort_image.value)
+		}
+
+		if (sortable) th_props.class += " __sortable"
+		else th_props.class += " __middle"
+		th_props.onClick = () => sortData(i)
+
+		if (typeof vdom_th.children == 'string') new_children.push(h(createTextVNode(vdom_th.children)))
+		else new_children = new_children.concat(vdom_th.children)
+
+		const new_header = h(vdom_th.type, th_props, new_children)
+
+		list_th.push(new_header)
+	}
+	render_times.value++
+	the_tr.value = h('tr', {key: render_times.value}, list_th)
+	processed_header.value = true
+
+	nextTick(() => {
+		render(the_tr.value, thead.value)
+	})
+}
+
+async function getData() {
 	loading.value = true
 	let data = {
 		...options.value.ajax?.data,
@@ -296,23 +376,26 @@ function getData() {
 	}
 
 	let opt = {
-		url: options.value.ajax.url,
-		method: options.value.ajax.method || 'GET',
+		method: options.value.ajax.type,
+		mode: options.value.ajax.mode,
+		cache: options.value.ajax.cache,
+		credentials: options.value.ajax.credentials,
+			headers: options.value.ajax.headers,
+		redirect: options.value.ajax.redirect,
+		referrerPolicy: options.value.ajax.referrerPolicy
 	}
-	if (opt.method.toLowerCase() == 'get') {
-		opt.params = data
+	let { url } = options.value.ajax
+	if (opt.method == "GET") {
+		if (!url.includes("?")) url += "?"
+		else url += "&"
+		url += objectToQueryParams(data)
 	} else {
-		opt.data = data
+		opt.body = JSON.stringify(data)
 	}
-	axios(opt)
-	.then(res => {
-		loading.value = false
-		response_data.value.data = res.data
-	})
-	.catch(e => {
-		loading.value = false
-		console.log(e,'error @autotrof/av-datatable')
-	})
+	const response = await fetch(url, opt)
+	const json = await response.json()
+	loading.value = false
+	response_data.value = json
 }
 
 function firstPage() {
@@ -352,33 +435,35 @@ function lastPage() {
 }
 
 function sortData(column_index) {
-	const column = columns_html.value[column_index]
-	if (column.sortable) {
-		let new_order_column = column_index;
+	const column = the_tr.value.children[column_index]
+
+	if (column.props['data-sortable'] === 'true') {
 		let new_order_dir = 'asc'
+		if (options.value.order[0][0] == column_index) new_order_dir = options.value.order[0][1] == 'asc' ? 'desc' : 'asc'
+		options.value.order = [[column_index, new_order_dir]]
 
-		const current_order_column = options.value.order[0][0]
-
-		if (current_order_column == column_index) {
-			new_order_dir = options.value.order[0][1] == 'asc' ? 'desc' : 'asc'
+		for (let index in the_tr.value.children) {
+			const th = the_tr.value.children[index]
+			if (th.children[0].type == 'img' && th.children[0].props.class.includes('__sort')) {
+				the_tr.value.children[index].children.splice(0, 1)
+			}
 		}
-		options.value.order = [[new_order_column, new_order_dir]]
+
+		the_tr.value.children[column_index].children = [sort_image.value].concat(the_tr.value.children[column_index].children)
+		render_times.value++
+
+		let current_props = the_tr.value.props
+		current_props.key = render_times.value
+		const new_tr = h('tr', current_props, the_tr.value.children)
+
+		nextTick(() => {
+			render(new_tr, thead.value)
+		})
 	}
 }
 
-// COMPUTED
-const header_html = computed(() => {
-	let columns = []
-	for (let index in columns_html.value) {
-		if (index == options.value.order[0][0] && options.value.order[0][1] == 'asc') {
-			columns.push(`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-sort-ascending sort-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="white" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><line x1="4" y1="6" x2="11" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="13" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>` + columns_html.value[index].elm)
-		} else if(index == options.value.order[0][0] && options.value.order[0][1] == 'desc') {
-			columns.push(`<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-sort-descending sort-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="white" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><line x1="4" y1="6" x2="13" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="11" y2="18"></line><polyline points="15 15 18 18 21 15"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>` + columns_html.value[index].elm)
-		} else {
-			columns.push(columns_html.value[index].elm)
-		}
-	}
-	return columns
+const sort_image = computed(() => {
+	return h('img',{src: options.value.sortIcon[options.value.order[0][1]], class: '__sort'})
 })
 
 const displayLengthMenu = computed(() => {
@@ -417,53 +502,51 @@ const current_page = computed(() => {
 })
 
 const data_shown = computed(() => {
-	let data = []
-	if (local_data.value) {
-		data = JSON.parse(JSON.stringify(managed_local_data.value))
+	let data = JSON.parse(JSON.stringify(managed_local_data.value))
 
-		// LOCAL DATA FILTERING
-		if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null) {
-			const regex = regex_like(options.value.search)
-			data = data.filter((obj, index) => {
-				for (let value of obj.data) {
-					if (typeof value == 'number') {
-						value += ''
-					}
-					if (typeof value != 'string') continue
-					if (regex.test(value)) {
-						return true
-					}
+	// LOCAL DATA FILTERING
+	if (options.value.searching && options.value.search?.trim() !== '' && options.value.search !== undefined && options.value.search !== null) {
+		const regex = regex_like(options.value.search)
+		data = data.filter((val, index) => {
+			for (let value of val) {
+				if (typeof value == 'number') {
+					value += ''
 				}
-			})
-		}
-
-		local_records_filtered.value = data.length
-
-		// LOCAL DATA SORTING
-		const order = options.value.order
-		if (order[0][0] < columns_html.value.length && order[0][0] >= 0) {
-			data.sort((a, b) => {
-				if ( a.data[order[0][0]] < b.data[order[0][0]] ) return order[0][1] == 'asc' ? -1 : 1
-				if ( a.data[order[0][0]] > b.data[order[0][0]] ) return order[0][1] == 'asc' ? 1 : -1
-				return 0
-			})
-		}
-
-		if (options.value.paging && local_data.value) {
-			data = data.slice((current_page.value - 1) * options.value.pageLength, options.value.pageLength * current_page.value)
-		}
-		let indexes = data.map(d=>parseInt(d.index))
-		let new_vdoms = []
-		for (let vdom of vdoms.value) {
-			if (indexes.includes(vdom.key)) new_vdoms.push(vdom)
-		}
-		if (table.value) {
-			let tbody = h('tbody',new_vdoms)
-			render(tbody, table.value)
-		}
-	} else {
-		data = response_data.value.data
+				if (typeof value != 'string') continue
+				if (regex.test(value)) {
+					return true
+				}
+			}
+		})
 	}
+
+	local_records_filtered.value = data.length
+
+	// LOCAL DATA SORTING
+	const order = options.value.order
+	if (order[0][0] < (the_tr.value?.children?.length || 0) && order[0][0] >= 0) {
+		data.sort((a, b) => {
+			if ( a[order[0][0]] < b[order[0][0]] ) return order[0][1] == 'asc' ? -1 : 1
+			if ( a[order[0][0]] > b[order[0][0]] ) return order[0][1] == 'asc' ? 1 : -1
+			return 0
+		})
+	}
+
+	if (options.value.paging && local_data.value) {
+		data = data.slice((current_page.value - 1) * options.value.pageLength, options.value.pageLength * current_page.value)
+	}
+
+
+	if (table.value) {
+		const indexes = data.map(d => d[(d.length-1)])
+		let new_vdoms = []
+		for (let index of indexes) {
+			new_vdoms.push(vdoms.value[index])
+		}
+		const tbody = h('tbody', new_vdoms)
+		render(tbody, table.value)
+	}
+
 	return data
 })
 
@@ -475,20 +558,20 @@ const info = computed(() => {
 		end = options.value.pageLength != -1 ? start + data_shown.value.length - 1 : count_records_filtered.value
 		total = count_records_filtered.value
 	} else {
-		end = options.value.pageLength != -1 ? start + data_shown.value?.data?.length - 1 : data_shown.value?.recordsFiltered
-		total = data_shown.value?.recordsFiltered
+		end = options.value.pageLength != -1 ? start + response_data.value?.data?.length - 1 : response_data.value?.recordsFiltered
+		total = response_data.value?.recordsTotal
 	}
 	return options.value.language.info.replace('_START_', start).replace('_END_', end).replace('_TOTAL_', total)
 })
 
 const info_filtered = computed(() => {
-	const max = local_data.value ? count_records_total.value : (data_shown.value?.recordsTotal)
+	const max = local_data.value ? count_records_total.value : (response_data.value?.recordsTotal)
 	return options.value.language.infoFiltered.replace('_MAX_', max)
 })
 
 const max_page = computed(() => {
 	if (local_data.value) return Math.ceil(count_records_filtered.value / options.value.pageLength)
-	return Math.ceil(data_shown.value?.recordsFiltered / options.value.pageLength)
+	return Math.ceil(response_data.value?.recordsFiltered / options.value.pageLength)
 })
 
 const getDataWait = debounce(getData, 250)
@@ -526,6 +609,8 @@ onBeforeMount(() => {
 		if (localStorage.getItem(storage_key.value)) {
 			storageOptions = JSON.parse(localStorage.getItem(storage_key.value)) || {}
 		}
+	} else {
+		localStorage.removeItem(storage_key.value)
 	}
 
 	const props_options = props.options
@@ -542,6 +627,7 @@ onBeforeMount(() => {
 
 	// AJAX
 	if (props.options?.ajax) {
+		local_data.value = true
 		new_options.ajax = {
 			...new_options.ajax,
 			...props_options.ajax
@@ -572,18 +658,21 @@ onMounted(() => {
 	// kalau datanya lokal. kita manage sendiri
 	if (local_data.value) {
 		const tr_elms = table.value.querySelectorAll('tbody tr')
-		const body_slot = slots.default()
 
 		let ld = []
-		for (const index in body_slot[0].children) {
-			// render(body_slot[index], table.value.querySelector('tbody'))
-			const vdom = body_slot[0].children[index]
-			vdoms.value.push(vdom)
+		for (const index in tr_elms) {
+			const tr_elm = tr_elms[index]
+			if (typeof tr_elm != 'object') continue
+			const tds = tr_elm?.querySelectorAll('td')
 			let data = []
-			for (let index_td in vdom.children) {
-				data.push(tr_elms[index].querySelectorAll(`td,th`)[index_td].innerText)
+			for (let index_td in tds) {
+				const td_elm = tds[index_td]
+				if (typeof td_elm != 'object') continue
+				data.push(td_elm.innerText)
 			}
-			ld.push({index, data})
+			data.push(index)
+			ld.push(data)
+			vdoms.value.push(tr_elm.__vnode)
 		}
 		managed_local_data.value = ld
 		loading.value = false

@@ -1,6 +1,6 @@
 {
   "name": "@autotrof/av-datatable",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "files": [
     "dist/*"
   ],
@@ -20,8 +20,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@autotrof/regex-like": "^1.0.0",
-    "axios": "^1.4.0",
+    "@autotrof/regex-like": "^1.0.1",
+    "svg-parser": "^2.0.4",
     "underscore": "^1.13.6",
     "vue": "^3.2.47"
   },
