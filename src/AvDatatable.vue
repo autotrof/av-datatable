@@ -2,6 +2,9 @@
 	.datatable-wrapper {
 		width: 100%;
 	}
+	.datatable-wrapper table {
+		position: relative;
+	}
 	table.default-table {
 		position: relative;
 		border-collapse: collapse;
@@ -119,9 +122,8 @@
 	.input-search:focus, .input-display-length:focus {
 		outline: none;
 	}
-	.header-sticky {
-		position: sticky;
-		top: 0;
+	.scroll-x {
+		overflow-x: auto;
 	}
 </style>
 
@@ -159,6 +161,10 @@
 	.datatable-wrapper table thead .__middle {
 		vertical-align: middle;
 	}
+	.datatable-wrapper table thead .__header-sticky {
+		position: sticky;
+		top: 0;
+	}
 </style>
 
 <template>
@@ -176,18 +182,20 @@
 			</div>
 		</div>
 
-		<table ref="table" :class="options.tableClassName">
-			<thead v-if="!processed_header">
-				<tr>
-					<slot name="header"></slot>
-				</tr>
-			</thead>
-			<thead ref="thead" v-else></thead>
-			<tbody>
-				<slot v-if="managed_local_data.length == 0 && local_data"></slot>
-				<slot v-else-if="!local_data" :data="response_data"></slot>
-			</tbody>
-		</table>
+		<div ref="table_wrapper" style="width: 100%;" :class="{'scroll-x' : options.scrollX}">
+			<table ref="table" :class="options.tableClassName">
+				<thead v-if="!processed_header">
+					<tr>
+						<slot name="header"></slot>
+					</tr>
+				</thead>
+				<thead ref="thead" v-else></thead>
+				<tbody>
+					<slot v-if="managed_local_data.length == 0 && local_data"></slot>
+					<slot v-else-if="!local_data" :data="response_data"></slot>
+				</tbody>
+			</table>
+		</div>
 
 		<div class="backdrop-loading" v-if="loading" v-html="options.language.processing"></div>
 
@@ -222,6 +230,7 @@ const props = defineProps({
 	},
 })
 
+const table_wrapper = ref(null)
 const table = ref(null)
 const loading = ref(true)
 const local_data = ref(true)
@@ -236,6 +245,7 @@ const managed_local_data = ref([])
 const vdoms = ref([])
 const options = ref({
 	tableClassName: 'default-table',
+	scrollX: true,
 	ajax: {
 		url: null,
 		type: "GET",
@@ -337,6 +347,7 @@ function manageColumn() {
 			new_children.push(sort_image.value)
 		}
 
+		if (options.value.fixedHeader) th_props.class += " __header-sticky"
 		if (sortable) th_props.class += " __sortable"
 		else th_props.class += " __middle"
 		th_props.onClick = () => sortData(i)
