@@ -1,9 +1,11 @@
 <style scoped>
 	.datatable-wrapper {
 		width: 100%;
+		overflow-x: hidden;
 	}
 	.datatable-wrapper table {
 		position: relative;
+		width: 100%;
 	}
 	table.default-table {
 		position: relative;
@@ -122,9 +124,6 @@
 	.input-search:focus, .input-display-length:focus {
 		outline: none;
 	}
-	.scroll-x {
-		overflow-x: auto;
-	}
 </style>
 
 <style>
@@ -161,7 +160,7 @@
 	.datatable-wrapper table thead .__middle {
 		vertical-align: middle;
 	}
-	.datatable-wrapper table thead .__header-sticky {
+	.datatable-wrapper table .__header-sticky {
 		position: sticky;
 		top: 0;
 	}
@@ -182,7 +181,7 @@
 			</div>
 		</div>
 
-		<div ref="table_wrapper" style="width: 100%;" :class="{'scroll-x' : options.scrollX}">
+		<div ref="table_wrapper" style="overflow-x: auto;">
 			<table ref="table" :class="options.tableClassName">
 				<thead v-if="!processed_header">
 					<tr>
@@ -347,9 +346,11 @@ function manageColumn() {
 			new_children.push(sort_image.value)
 		}
 
-		if (options.value.fixedHeader) th_props.class += " __header-sticky"
 		if (sortable) th_props.class += " __sortable"
 		else th_props.class += " __middle"
+
+		if (options.value.fixedHeader) th_props.class += " __header-sticky"
+
 		th_props.onClick = () => sortData(i)
 
 		if (typeof vdom_th.children == 'string') new_children.push(h(createTextVNode(vdom_th.children)))
