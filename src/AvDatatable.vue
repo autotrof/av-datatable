@@ -203,7 +203,7 @@
 			<div class="pagination" v-if="options.paging">
 				<button :disabled="options.page <= 1" @click="firstPage()" type="button" v-html="options.language.paginate.first"></button>
 				<button :disabled="options.page <= 1" @click="prevPage()" type="button" v-html="options.language.paginate.previous"></button>
-				<input type="number" @input="getDataWait" :max="max_page" :min="1" v-model="options.page">
+				<input type="number" @input="getData" :max="max_page" :min="1" v-model="options.page">
 				<button :disabled="options.page >= max_page" @click="nextPage()" type="button" v-html="options.language.paginate.next"></button>
 				<button :disabled="options.page >= max_page" @click="lastPage()" type="button" v-html="options.language.paginate.last"></button>
 			</div>
@@ -370,6 +370,7 @@ function manageColumn() {
 }
 
 async function getData() {
+	if (local_data.value) return;
 	loading.value = true
 	let data = {
 		...options.value.ajax?.data,

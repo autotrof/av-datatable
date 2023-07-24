@@ -44,8 +44,8 @@ npm i @autotrof/av-datatable
 </template>
 
 <script setup>
-import AvDatatable from 'av-datatable'
-import 'av-datatable/style.css'
+import AvDatatable from '@autotrof/av-datatable'
+import '@autotrof/av-datatable/dist/style.css'
 
 function trClicked(index) {
   console.log('tr ' + index + 'clicked. yeay')
@@ -94,8 +94,8 @@ this component will automatically render pagination and add filtering in your ta
 </template>
 
 <script setup>
-import AvDatatable from 'av-datatable'
-import 'av-datatable/style.css'
+import AvDatatable from '@autotrof/av-datatable'
+import '@autotrof/av-datatable/dist/style.css'
 
 function trClicked(index) {
   console.log('tr ' + index + 'clicked. yeay')
